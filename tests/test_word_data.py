@@ -133,3 +133,9 @@ def test_word_data_error_holds_problems():
     err = WordDataError(['a', 'b'])
     assert err.problems == ['a', 'b']
     assert 'a' in str(err) and 'b' in str(err)
+
+
+def test_duplicate_word_within_same_week():
+    primary = good_primary()
+    primary[0]['words'][1] = make_word('apple')
+    assert "primary week 1: 'apple' appears more than once" in run(primary=primary)

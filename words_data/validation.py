@@ -53,10 +53,12 @@ def _check_level(level, data, expected_weeks, words_per_week):
                 problems.append(f'{name}: sentence does not contain the word')
             if text:
                 key = text.lower()
-                if key in first_week_of and first_week_of[key] != week:
-                    problems.append(f"{level}: '{key}' appears in weeks {first_week_of[key]} and {week}")
+                if key not in first_week_of:
+                    first_week_of[key] = week
+                elif first_week_of[key] == week:
+                    problems.append(f"{label}: '{key}' appears more than once")
                 else:
-                    first_week_of.setdefault(key, week)
+                    problems.append(f"{level}: '{key}' appears in weeks {first_week_of[key]} and {week}")
 
     return problems
 
