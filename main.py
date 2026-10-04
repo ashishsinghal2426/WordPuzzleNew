@@ -1,12 +1,16 @@
 import json
 import os
 import random
+import shutil
 import sys
+from datetime import datetime
 import requests
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, Word, TestAttempt, TestAnswer
+from sqlalchemy import inspect
+from models import (db, User, Word, TestAttempt, TestAnswer,
+                    STATUS_CORRECT, STATUS_INCORRECT)
 from words_data import PRIMARY_WORDS, SECONDARY_WORDS, WordDataError, validate_word_data
 
 app = Flask(__name__)
@@ -21,11 +25,12 @@ login_manager.login_view = 'login'
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 
 WEEKS_PER_LEVEL = {'primary': 30, 'secondary': 20}
 WORDS_PER_WEEK = 10
+MAX_ATTEMPTS = 3
 
 
 def setup_database():
@@ -33,25 +38,53 @@ def setup_database():
                                  weeks=WEEKS_PER_LEVEL, words_per_week=WORDS_PER_WEEK)
     if problems:
         raise WordDataError(problems)
+    if _has_legacy_test_schema():
+        # One-time wipe: only possible while the old table layout is present.
+        backup_path = _backup_sqlite_db()
+        TestAnswer.__table__.drop(db.engine)
+        TestAttempt.__table__.drop(db.engine)
+        app.logger.warning('Upgraded test history schema; old attempts removed; backup at %s',
+                           backup_path)
     db.create_all()
-    if Word.query.count() == 0:
-        for level_name, data in [('primary', PRIMARY_WORDS), ('secondary', SECONDARY_WORDS)]:
-            for week_data in data:
-                for w in week_data['words']:
-                    word = Word(
-                        word=w['word'],
-                        pos=w.get('pos', ''),
-                        meaning=w['meaning'],
-                        sentence=w.get('sentence', ''),
-                        synonyms=json.dumps(w.get('synonyms', [])),
-                        antonyms=json.dumps(w.get('antonyms', [])),
-                        week_number=week_data['week'],
-                        theme=week_data['theme'],
-                        level=level_name
-                    )
-                    db.session.add(word)
-        db.session.commit()
+    _add_missing_words()
     _ensure_admin()
+
+
+def _has_legacy_test_schema():
+    insp = inspect(db.engine)
+    if not insp.has_table('test_attempt'):
+        return False
+    return 'attempt_number' not in {c['name'] for c in insp.get_columns('test_attempt')}
+
+
+def _backup_sqlite_db():
+    url = db.engine.url
+    if url.get_backend_name() != 'sqlite' or not url.database or not os.path.exists(url.database):
+        return None
+    backup_path = f"{url.database}.bak-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    shutil.copy2(url.database, backup_path)
+    return backup_path
+
+
+def _add_missing_words():
+    existing = {(level, word.lower()) for level, word in db.session.query(Word.level, Word.word)}
+    for level_name, data in [('primary', PRIMARY_WORDS), ('secondary', SECONDARY_WORDS)]:
+        for week_data in data:
+            for w in week_data['words']:
+                if (level_name, w['word'].lower()) in existing:
+                    continue
+                db.session.add(Word(
+                    word=w['word'],
+                    pos=w.get('pos', ''),
+                    meaning=w['meaning'],
+                    sentence=w.get('sentence', ''),
+                    synonyms=json.dumps(w.get('synonyms', [])),
+                    antonyms=json.dumps(w.get('antonyms', [])),
+                    week_number=week_data['week'],
+                    theme=week_data['theme'],
+                    level=level_name
+                ))
+    db.session.commit()
 
 
 def _ensure_admin():
@@ -242,7 +275,7 @@ def week_test_submit(week_num):
     }
     attempt = TestAttempt(
         user_id=current_user.id, week_number=week_num,
-        level=level, score=0, total=len(valid_words)
+        level=level, attempt_number=1, score=0, total=len(valid_words)
     )
     db.session.add(attempt)
     db.session.flush()
@@ -258,6 +291,7 @@ def week_test_submit(week_num):
             attempt_id=attempt.id, word_id=word.id,
             user_answer=str(a.get('user_answer', '')).strip(),
             is_correct=correct,
+            status=STATUS_CORRECT if correct else STATUS_INCORRECT,
             attempt_count=int(a.get('attempt_count', 1))
         ))
     attempt.score = score
