@@ -1,0 +1,38 @@
+# Secondary level word data: one entry per week.
+
+SECONDARY_WORDS = [
+    {'week': 1, 'theme': 'Character', 'words': [
+        {'word': 'resilient', 'pos': 'adjective', 'meaning': 'Able to recover quickly from difficulties.',
+         'sentence': 'The resilient team bounced back after losing the first match.',
+         'synonyms': ['tough', 'hardy'], 'antonyms': ['fragile', 'vulnerable']},
+        {'word': 'meticulous', 'pos': 'adjective', 'meaning': 'Showing great attention to detail.',
+         'sentence': 'Her meticulous notes made revision easy.',
+         'synonyms': ['careful', 'thorough'], 'antonyms': ['careless', 'sloppy']},
+        {'word': 'humble', 'pos': 'adjective', 'meaning': 'Having a modest view of one\'s own importance.',
+         'sentence': 'Despite winning, he remained humble.',
+         'synonyms': ['modest'], 'antonyms': ['arrogant', 'proud']},
+        {'word': 'diligent', 'pos': 'adjective', 'meaning': 'Having or showing care and effort in one\'s work.',
+         'sentence': 'A diligent student checks every answer twice.',
+         'synonyms': ['hardworking', 'industrious'], 'antonyms': ['lazy']},
+        {'word': 'candid', 'pos': 'adjective', 'meaning': 'Truthful and straightforward.',
+         'sentence': 'She gave a candid account of what happened.',
+         'synonyms': ['frank', 'honest'], 'antonyms': ['evasive']},
+    ]},
+    {'week': 2, 'theme': 'Debate', 'words': [
+        {'word': 'persuade', 'pos': 'verb', 'meaning': 'To convince someone to do or believe something.',
+         'sentence': 'He tried to persuade the class to vote for him.',
+         'synonyms': ['convince', 'coax'], 'antonyms': ['dissuade']},
+        {'word': 'contradict', 'pos': 'verb', 'meaning': 'To state the opposite of what someone has said.',
+         'sentence': 'The evidence seemed to contradict his story.',
+         'synonyms': ['dispute', 'oppose'], 'antonyms': ['confirm', 'agree']},
+        {'word': 'rhetoric', 'pos': 'noun', 'meaning': 'The art of effective or persuasive speaking or writing.',
+         'sentence': 'The speech was full of powerful rhetoric.',
+         'synonyms': ['oratory', 'eloquence'], 'antonyms': []},
+        {'word': 'concede', 'pos': 'verb', 'meaning': 'To admit that something is true after first denying it.',
+         'sentence': 'She had to concede that her opponent made a good point.',
+         'synonyms': ['admit', 'acknowledge'], 'antonyms': ['deny']},
+        {'word': 'biased', 'pos': 'adjective', 'meaning': 'Unfairly favouring one side over another.',
+         'sentence': 'The referee was accused of being biased.',
+         'synonyms': ['partial', 'one-sided'], 'antonyms': ['impartial', 'fair']},
+    ]},
+]
