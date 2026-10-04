@@ -2,15 +2,21 @@
 {% block title %}Week {{ week_num }} results · WordPuzzle{% endblock %}
 {% block content %}
 <p><a href="{{ url_for('plan') }}">&larr; Back to plan</a></p>
-<h1>Week {{ week_num }} results</h1>
+<h1>Week {{ week_num }} results · Attempt {{ attempt.attempt_number }} of {{ max_attempts }}</h1>
 <p class="muted">{{ theme }} · {{ level|capitalize }}</p>
 
 <div class="card">
   <div class="score">{{ attempt.score }} / {{ attempt.total }}</div>
+  <div class="counts">
+    <span class="correct">{{ counts.correct }} correct</span>
+    <span class="incorrect">{{ counts.incorrect }} incorrect</span>
+    <span class="unattempted">{{ counts.unattempted }} not attempted</span>
+  </div>
   <div class="muted">Completed {{ attempt.completed_at.strftime('%d %b %Y, %H:%M') }} UTC</div>
 </div>
 
 <div class="card">
+  <div class="table-scroll">
   <table>
     <thead>
       <tr><th>Word</th><th>Your answer</th><th>Tries</th><th>Result</th></tr>
@@ -19,12 +25,39 @@
       {% for r in result_rows %}
         <tr>
           <td><strong>{{ r.word }}</strong>{% if r.pos %} <span class="muted">({{ r.pos }})</span>{% endif %}<br><span class="muted">{{ r.meaning }}</span></td>
-          <td>{{ r.user_answer }}</td>
-          <td>{{ r.attempt_count }}</td>
-          <td class="{{ 'correct' if r.is_correct else 'incorrect' }}">{{ 'Correct' if r.is_correct else 'Incorrect' }}</td>
+          <td>{{ r.user_answer if r.status != 'unattempted' else '—' }}</td>
+          <td>{{ r.attempt_count if r.status != 'unattempted' else '—' }}</td>
+          <td class="{{ r.status }}">{{ {'correct': 'Correct', 'incorrect': 'Incorrect'}.get(r.status, 'Not attempted') }}</td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Your attempts</h2>
+  <div class="table-scroll">
+  <table>
+    <thead>
+      <tr><th>Attempt</th><th>Date (UTC)</th><th>Correct</th><th>Incorrect</th><th>Unattempted</th><th>Score</th></tr>
+    </thead>
+    <tbody>
+      {% for h in attempts %}
+        <tr{% if h.attempt.id == attempt.id %} class="current"{% endif %}>
+          <td><a href="{{ url_for('week_results', week_num=week_num, attempt=h.attempt.attempt_number) }}">Attempt {{ h.attempt.attempt_number }}</a></td>
+          <td>{{ h.attempt.completed_at.strftime('%d %b %Y, %H:%M') }}</td>
+          <td>{{ h.correct }}</td>
+          <td>{{ h.incorrect }}</td>
+          <td>{{ h.unattempted }}</td>
+          <td>{{ h.attempt.score }} / {{ h.attempt.total }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if can_retake %}
+    <p style="margin-top:12px"><a class="btn" href="{{ url_for('week_test', week_num=week_num) }}">Take test again</a></p>
+  {% endif %}
 </div>
 {% endblock %}

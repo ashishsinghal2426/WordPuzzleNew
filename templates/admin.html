@@ -7,26 +7,60 @@
   <div class="card"><div class="muted">Users</div><div class="score">{{ total_users }}</div></div>
   <div class="card"><div class="muted">Correct answers</div><div class="score correct">{{ total_correct }}</div></div>
   <div class="card"><div class="muted">Incorrect answers</div><div class="score incorrect">{{ total_incorrect }}</div></div>
+  <div class="card"><div class="muted">Unattempted</div><div class="score unattempted">{{ total_unattempted }}</div></div>
 </div>
 
 <div class="card">
-  <h2>Users</h2>
+  <h2>Learner progress</h2>
+  <div class="table-scroll">
   <table>
     <thead>
-      <tr><th>Username</th><th>Level</th><th>Weeks done</th><th>Score</th><th>Joined</th></tr>
+      <tr><th>Username</th><th>Level</th><th>Tests completed</th><th>Completion</th><th>Attempts used</th><th>Joined</th></tr>
     </thead>
     <tbody>
-      {% for u in user_stats %}
+      {% for u in learner_progress %}
         <tr>
           <td>{{ u.username }}{% if u.is_admin %} <span class="badge">admin</span>{% endif %}</td>
           <td>{{ u.level|capitalize }}</td>
-          <td>{{ u.weeks_completed }}</td>
-          <td>{{ u.total_score }} / {{ u.total_possible }}</td>
+          <td>{{ u.completed }} / {{ u.weeks }}</td>
+          <td>{{ u.completion_pct }}%</td>
+          <td>{{ u.attempts_used }} / {{ u.attempts_possible }} ({{ u.attempts_pct }}%)</td>
           <td>{{ u.created_at.strftime('%d %b %Y') if u.created_at else '' }}</td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Test details</h2>
+  {% if test_details %}
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>User</th><th>Level</th><th>Week</th><th>Attempt</th><th>Date (UTC)</th><th>Correct</th><th>Incorrect</th><th>Unattempted</th><th>Score %</th></tr>
+      </thead>
+      <tbody>
+        {% for d in test_details %}
+          <tr class="attempt-row">
+            <td>{{ d.username }}</td>
+            <td>{{ d.level|capitalize }}</td>
+            <td>{{ d.week_number }}</td>
+            <td>{{ d.attempt_number }}</td>
+            <td>{{ d.completed_at.strftime('%d %b %Y %H:%M') if d.completed_at else '' }}</td>
+            <td class="correct">{{ d.correct }}</td>
+            <td class="incorrect">{{ d.incorrect }}</td>
+            <td class="unattempted">{{ d.unattempted }}</td>
+            <td>{{ d.score_pct }}%</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  {% else %}
+    <p class="muted">No tests taken yet.</p>
+  {% endif %}
 </div>
 
 <div class="card">
