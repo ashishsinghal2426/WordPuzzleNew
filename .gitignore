@@ -35,3 +35,6 @@ Thumbs.db
 # Flask instance folder (SQLite database)
 instance/
 *.db
+
+# Personal Claude Code settings
+.claude/settings.local.json
