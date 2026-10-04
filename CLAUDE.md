@@ -10,16 +10,19 @@ GitHub remote: https://github.com/ashishsinghal2426/WordPuzzleNew
 
 ## Current Repo State
 
-Only `main.py`, `models.py`, and `requirements.txt` are committed. `words_data.py` and every template in `templates/` are missing, and `static/css` and `static/js` are empty. `main.py` imports `words_data` at module load, so the app will not start until those files exist. Do not assume template contents; ask or recreate them.
+`words_data.py` is a **sample** set (primary weeks 1–3, secondary weeks 1–2, 5 words each); the remaining weeks show as "Coming soon" until the full lists are added. The templates and `static/css/style.css` were rebuilt to match the context each route passes; the originals were lost.
 
 ## Running the App
 
+On this machine `python` (Microsoft Store) and `pip` (miniconda) are different interpreters, so use the project venv:
+
 ```bash
-pip install -r requirements.txt
-python main.py
+python -m venv .venv
+.venv/Scripts/python -m pip install -r requirements.txt
+.venv/Scripts/python main.py
 ```
 
-The app runs on `http://localhost:5000` in debug mode. The SQLite database (`wordpuzzle.db`) and tables are created automatically on first run, and the word data is seeded from `words_data.py`.
+The app runs on `http://localhost:5000` in debug mode. Flask-SQLAlchemy creates the SQLite database at `instance/wordpuzzle.db` (gitignored) on first run, and the word data is seeded from `words_data.py`.
 
 Default admin credentials: `admin` / `admin123`
 
@@ -35,9 +38,9 @@ This is a Flask web application for a vocabulary learning game organized around 
 - `TestAttempt` — one record per user per week per level (tests are one-shot; retaking is blocked)
 - `TestAnswer` — per-word answer records linked to a `TestAttempt`, including `attempt_count` for how many tries the user needed
 
-**Word data (`words_data.py`, not committed):** Exports `PRIMARY_WORDS` and `SECONDARY_WORDS` — lists of dicts with shape `{'week': int, 'theme': str, 'words': [...]}`. Each word is `{'word': str, 'meaning': str, 'pos'?: str, 'sentence'?: str, 'synonyms'?: [str], 'antonyms'?: [str]}` (see `init_db()` in `main.py`). Seeding only runs when the `Word` table is empty, so delete `wordpuzzle.db` to reload changed word data. Primary level has 30 weeks; secondary has 20.
+**Word data (`words_data.py`):** Exports `PRIMARY_WORDS` and `SECONDARY_WORDS` — lists of dicts with shape `{'week': int, 'theme': str, 'words': [...]}`. Each word is `{'word': str, 'meaning': str, 'pos'?: str, 'sentence'?: str, 'synonyms'?: [str], 'antonyms'?: [str]}` (see `init_db()` in `main.py`). Seeding only runs when the `Word` table is empty, so delete `instance/wordpuzzle.db` to reload changed word data. Primary level has 30 weeks; secondary has 20.
 
-**Templates:** Jinja2 templates referenced by routes: `login.html`, `register.html`, `select_level.html`, `plan.html`, `week.html`, `test.html`, `results.html`, `admin.html`.
+**Templates:** All extend `base.html` (navbar + flash messages). Route templates: `login.html`, `register.html`, `select_level.html`, `plan.html`, `week.html`, `test.html`, `results.html`, `admin.html`. `test.html` runs the test client-side (3 tries per word) and POSTs `{answers: [{word_id, user_answer, attempt_count}]}` to the submit endpoint.
 
 **Key route flow:**
 - `/` redirects to `/plan` (authenticated) or `/login`

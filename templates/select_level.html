@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Choose level · WordPuzzle{% endblock %}
+{% block container_class %}narrow{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Choose your level</h1>
+  <form method="post">
+    <label class="level-option">
+      <input type="radio" name="level" value="primary" {% if current_level == 'primary' %}checked{% endif %}>
+      Primary (30 weeks)
+    </label>
+    <label class="level-option">
+      <input type="radio" name="level" value="secondary" {% if current_level == 'secondary' %}checked{% endif %}>
+      Secondary (20 weeks)
+    </label>
+    <button class="btn btn-block" type="submit">Save</button>
+  </form>
+</div>
+{% endblock %}

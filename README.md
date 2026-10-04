@@ -18,9 +18,9 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Open http://localhost:5000. On first run the app creates the SQLite database (`wordpuzzle.db`), loads the words from `words_data.py`, and creates a default admin account: `admin` / `admin123` (change it before deploying).
+Open http://localhost:5000. On first run the app creates the SQLite database (`instance/wordpuzzle.db`), loads the words from `words_data.py`, and creates a default admin account: `admin` / `admin123` (change it before deploying).
 
-> **Note:** `words_data.py` and the Jinja templates in `templates/` are not yet in this repository. The app will not start without them. See [CLAUDE.md](CLAUDE.md) for the expected word data format.
+> **Note:** `words_data.py` currently holds a small sample set (a few weeks per level). Replace it with the full word lists; see [CLAUDE.md](CLAUDE.md) for the expected format.
 
 ## Tech stack
 
@@ -31,7 +31,7 @@ Flask · Flask-SQLAlchemy (SQLite) · Flask-Login · Jinja2 · requests
 ```
 main.py           Flask app, routes, and database seeding
 models.py         User, Word, TestAttempt, TestAnswer models
-words_data.py     Weekly word lists (not committed)
+words_data.py     Weekly word lists (sample data)
 templates/        Jinja2 page templates
 static/           CSS and JavaScript
 ```

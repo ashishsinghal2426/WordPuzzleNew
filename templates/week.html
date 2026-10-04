@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Week {{ week_num }} · WordPuzzle{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('plan') }}">&larr; Back to plan</a></p>
+<h1>Week {{ week_num }}: {{ theme }}</h1>
+
+<div class="card">
+  {% if completed %}
+    <p>You scored <strong>{{ attempt.score }} / {{ attempt.total }}</strong> on this week's test.</p>
+    <a class="btn" href="{{ url_for('week_results', week_num=week_num) }}">View results</a>
+  {% else %}
+    <p>Study the words below, then take the spelling test. You only get one attempt.</p>
+    <a class="btn" href="{{ url_for('week_test', week_num=week_num) }}">Start test</a>
+  {% endif %}
+</div>
+
+{% for w in words %}
+  <div class="card">
+    <h2>{{ w.word }} {% if w.pos %}<span class="badge">{{ w.pos }}</span>{% endif %}</h2>
+    <p>{{ w.meaning }}</p>
+    {% if w.sentence %}<p class="muted"><em>{{ w.sentence }}</em></p>{% endif %}
+    {% if w.synonyms %}<div>Synonyms: {% for s in w.synonyms %}<span class="tag">{{ s }}</span>{% endfor %}</div>{% endif %}
+    {% if w.antonyms %}<div>Antonyms: {% for a in w.antonyms %}<span class="tag">{{ a }}</span>{% endfor %}</div>{% endif %}
+    <button class="btn btn-secondary lookup" data-word="{{ w.word }}" style="margin-top:12px">More from dictionary</button>
+    <div class="dict muted"></div>
+  </div>
+{% endfor %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.lookup').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var out = btn.nextElementSibling;
+    out.textContent = 'Loading…';
+    fetch('/api/word/' + encodeURIComponent(btn.dataset.word))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!Array.isArray(data)) { out.textContent = 'No dictionary entry found.'; return; }
+        var entry = data[0];
+        var phonetic = entry.phonetic || '';
+        var defs = [];
+        (entry.meanings || []).forEach(function (m) {
+          (m.definitions || []).slice(0, 2).forEach(function (d) {
+            defs.push(m.partOfSpeech + ': ' + d.definition);
+          });
+        });
+        out.textContent = (phonetic ? phonetic + ' — ' : '') + defs.join(' | ');
+      })
+      .catch(function () { out.textContent = 'Dictionary lookup failed.'; });
+  });
+});
+</script>
+{% endblock %}

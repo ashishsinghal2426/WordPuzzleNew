@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Week {{ week_num }} test · WordPuzzle{% endblock %}
+{% block container_class %}narrow{% endblock %}
+{% block content %}
+<h1>Week {{ week_num }} test</h1>
+<p class="muted">{{ theme }} · Spell the word that matches each clue. You get 3 tries per word.</p>
+
+<div class="card" id="test-card">
+  <div class="progress" id="progress"></div>
+  <p class="test-word"><span class="badge" id="pos"></span> <span id="meaning"></span></p>
+  <p class="muted"><em id="sentence"></em></p>
+  <form id="answer-form" autocomplete="off">
+    <input type="text" id="answer" placeholder="Type the word" required autofocus>
+    <button class="btn btn-block" type="submit" id="check-btn">Check</button>
+  </form>
+  <div class="feedback" id="feedback"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var WORDS = {{ words|tojson }};
+var MAX_TRIES = 3;
+var SUBMIT_URL = "{{ url_for('week_test_submit', week_num=week_num) }}";
+
+var index = 0, tries = 0, answers = [];
+var el = function (id) { return document.getElementById(id); };
+
+function blank(sentence, word) {
+  return sentence.replace(new RegExp(word, 'ig'), '_____');
+}
+
+function show() {
+  var w = WORDS[index];
+  tries = 0;
+  el('progress').textContent = 'Word ' + (index + 1) + ' of ' + WORDS.length;
+  el('pos').textContent = w.pos || '';
+  el('meaning').textContent = w.meaning;
+  el('sentence').textContent = w.sentence ? blank(w.sentence, w.word) : '';
+  el('answer').value = '';
+  el('answer').disabled = false;
+  el('check-btn').disabled = false;
+  el('feedback').textContent = '';
+  el('answer').focus();
+}
+
+function next(userAnswer) {
+  answers.push({ word_id: WORDS[index].id, user_answer: userAnswer, attempt_count: tries });
+  el('answer').disabled = true;
+  el('check-btn').disabled = true;
+  index++;
+  setTimeout(index < WORDS.length ? show : submit, 1000);
+}
+
+function submit() {
+  el('feedback').textContent = 'Submitting…';
+  fetch(SUBMIT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answers: answers })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) { window.location = data.redirect_url; })
+    .catch(function () { el('feedback').textContent = 'Could not submit. Please try again.'; });
+}
+
+el('answer-form').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var value = el('answer').value.trim();
+  if (!value) return;
+  tries++;
+  var fb = el('feedback');
+  if (value.toLowerCase() === WORDS[index].word.toLowerCase()) {
+    fb.className = 'feedback correct';
+    fb.textContent = 'Correct!';
+    next(value);
+  } else if (tries >= MAX_TRIES) {
+    fb.className = 'feedback incorrect';
+    fb.textContent = 'The word was "' + WORDS[index].word + '".';
+    next(value);
+  } else {
+    fb.className = 'feedback incorrect';
+    fb.textContent = 'Not quite. ' + (MAX_TRIES - tries) + ' tries left.';
+    el('answer').select();
+  }
+});
+
+show();
+</script>
+{% endblock %}

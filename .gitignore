@@ -31,3 +31,7 @@ coverage.xml
 # OS
 .DS_Store
 Thumbs.db
+
+# Flask instance folder (SQLite database)
+instance/
+*.db

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Admin · WordPuzzle{% endblock %}
+{% block content %}
+<h1>Admin dashboard</h1>
+
+<div class="grid">
+  <div class="card"><div class="muted">Users</div><div class="score">{{ total_users }}</div></div>
+  <div class="card"><div class="muted">Correct answers</div><div class="score correct">{{ total_correct }}</div></div>
+  <div class="card"><div class="muted">Incorrect answers</div><div class="score incorrect">{{ total_incorrect }}</div></div>
+</div>
+
+<div class="card">
+  <h2>Users</h2>
+  <table>
+    <thead>
+      <tr><th>Username</th><th>Level</th><th>Weeks done</th><th>Score</th><th>Joined</th></tr>
+    </thead>
+    <tbody>
+      {% for u in user_stats %}
+        <tr>
+          <td>{{ u.username }}{% if u.is_admin %} <span class="badge">admin</span>{% endif %}</td>
+          <td>{{ u.level|capitalize }}</td>
+          <td>{{ u.weeks_completed }}</td>
+          <td>{{ u.total_score }} / {{ u.total_possible }}</td>
+          <td>{{ u.created_at.strftime('%d %b %Y') if u.created_at else '' }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Average score per week</h2>
+  {% if per_week_averages %}
+    <table>
+      <thead><tr><th>Level</th><th>Week</th><th>Average</th><th>Attempts</th></tr></thead>
+      <tbody>
+        {% for w in per_week_averages %}
+          <tr>
+            <td>{{ w.level|capitalize }}</td>
+            <td>{{ w.week_number }}</td>
+            <td>{{ w.average_pct }}%</td>
+            <td>{{ w.count }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No tests taken yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

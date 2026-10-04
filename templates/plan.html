@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Weekly plan · WordPuzzle{% endblock %}
+{% block content %}
+{% set done = weeks|selectattr('completed')|list|length %}
+<h1>{{ level|capitalize }} plan</h1>
+<p class="muted">{{ done }} of {{ weeks|length }} weeks completed</p>
+<div class="grid">
+  {% for w in weeks %}
+    <a class="card week-card {% if not w.word_count %}empty{% endif %}"
+       href="{{ url_for('week_view', week_num=w.week_number) }}">
+      <h3>Week {{ w.week_number }}</h3>
+      <div>{{ w.theme or 'Coming soon' }}</div>
+      <div class="muted">{{ w.word_count }} words</div>
+      {% if w.completed %}<span class="badge badge-done">Completed</span>{% endif %}
+    </a>
+  {% endfor %}
+</div>
+{% endblock %}
