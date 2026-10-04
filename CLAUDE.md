@@ -51,3 +51,21 @@ This is a Flask web application for a vocabulary learning game organized around 
 - `/week/<n>/results` — score breakdown
 - `/api/word/<word>` — proxies to `dictionaryapi.dev`
 - `/admin` — admin-only dashboard with per-user and per-week stats
+
+## Testing
+
+There is no automated test suite. Verify changes by running the app and driving it with `curl` and a cookie jar: register (`username`, `password`, `confirm_password`, `level` form fields), log in, load `/plan` and `/week/1`, then POST JSON to `/week/1/test/submit` and check `/week/1/results`. A second test attempt on the same week must redirect to results. Log in as `admin` to check `/admin`. The test page logic lives in inline JS in `test.html`, so a curl run does not exercise it; at minimum extract the `<script>` and run `node --check` on it.
+
+## Gotchas
+
+- Debug mode starts a reloader child process. After stopping the server, confirm nothing is still listening on port 5000.
+- `/api/word/<word>` depends on `api.dictionaryapi.dev`, which is sometimes down (Cloudflare 522). A 502 from the proxy usually means the upstream is unavailable, not an app bug.
+- Week counts are hardcoded in `weeks_for_level()` in `main.py`, not derived from `words_data.py`.
+- Answers are graded server-side (case-insensitive, trimmed) in `week_test_submit`; the client-side check in `test.html` only drives the 3-try UI.
+- `app.secret_key` and the default admin password are hardcoded in `main.py`; change both before any deployment.
+
+## Repo Conventions
+
+- Commit messages follow `.claude/Commands/Commit-Message.md`: `<emoji> <type>: <description>` (`✨ feat`, `🐛 fix`, `🔨 refactor`, `📝 docs`, `🎨 style`, `✅ test`, `⚡ perf`), present tense, with a body explaining why. Propose the message and wait for approval before committing.
+- `.claude/` also holds a `spec` command (templates in `.claude/_specs/`) and the `figma-design-extractor` agent. `.claude/settings.local.json` is personal and gitignored.
+- `.venv/` and `instance/` (the SQLite database) are gitignored; never commit `*.db` files.
