@@ -11,7 +11,10 @@
       <h3>Week {{ w.week_number }}</h3>
       <div>{{ w.theme or 'Coming soon' }}</div>
       <div class="muted">{{ w.word_count }} words</div>
-      {% if w.completed %}<span class="badge badge-done">Completed</span>{% endif %}
+      {% if w.completed %}
+        <span class="badge badge-done">Latest {{ w.latest_score }}/{{ w.latest_total }}</span>
+        <div class="muted">{{ w.attempts_used }} of {{ max_attempts }} attempts</div>
+      {% endif %}
     </a>
   {% endfor %}
 </div>

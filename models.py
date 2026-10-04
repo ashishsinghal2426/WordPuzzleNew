@@ -30,6 +30,7 @@ class Word(db.Model):
     level = db.Column(db.String(20), nullable=False)  # 'primary' or 'secondary'
 
 class TestAttempt(db.Model):
+    __test__ = False  # not a pytest class
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     week_number = db.Column(db.Integer, nullable=False)
@@ -45,6 +46,7 @@ class TestAttempt(db.Model):
     )
 
 class TestAnswer(db.Model):
+    __test__ = False  # not a pytest class
     id = db.Column(db.Integer, primary_key=True)
     attempt_id = db.Column(db.Integer, db.ForeignKey('test_attempt.id'), nullable=False)
     word_id = db.Column(db.Integer, db.ForeignKey('word.id'), nullable=False)

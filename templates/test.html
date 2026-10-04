@@ -2,7 +2,7 @@
 {% block title %}Week {{ week_num }} test · WordPuzzle{% endblock %}
 {% block container_class %}narrow{% endblock %}
 {% block content %}
-<h1>Week {{ week_num }} test</h1>
+<h1>Week {{ week_num }} test · Attempt {{ attempt_number }} of {{ max_attempts }}</h1>
 <p class="muted">{{ theme }} · Spell the word that matches each clue. You get 3 tries per word.</p>
 
 <div class="card" id="test-card">
@@ -13,6 +13,7 @@
     <input type="text" id="answer" placeholder="Type the word" required autofocus>
     <button class="btn btn-block" type="submit" id="check-btn">Check</button>
   </form>
+  <button type="button" class="btn btn-secondary btn-block" id="skip-btn">Skip this word</button>
   <div class="feedback" id="feedback"></div>
 </div>
 {% endblock %}
@@ -23,7 +24,11 @@ var WORDS = {{ words|tojson }};
 var MAX_TRIES = 3;
 var SUBMIT_URL = "{{ url_for('week_test_submit', week_num=week_num) }}";
 
+var ATTEMPT_NUMBER = {{ attempt_number }};
+
 var index = 0, tries = 0, answers = [];
+var lastWrong = '';
+var submitted = false;
 var el = function (id) { return document.getElementById(id); };
 
 function blank(sentence, word) {
@@ -33,6 +38,8 @@ function blank(sentence, word) {
 function show() {
   var w = WORDS[index];
   tries = 0;
+  lastWrong = '';
+  el('skip-btn').disabled = false;
   el('progress').textContent = 'Word ' + (index + 1) + ' of ' + WORDS.length;
   el('pos').textContent = w.pos || '';
   el('meaning').textContent = w.meaning;
@@ -48,21 +55,41 @@ function next(userAnswer) {
   answers.push({ word_id: WORDS[index].id, user_answer: userAnswer, attempt_count: tries });
   el('answer').disabled = true;
   el('check-btn').disabled = true;
+  el('skip-btn').disabled = true;
   index++;
   setTimeout(index < WORDS.length ? show : submit, 1000);
 }
 
 function submit() {
+  if (submitted) return;
+  submitted = true;
+  el('feedback').className = 'feedback';
   el('feedback').textContent = 'Submitting…';
   fetch(SUBMIT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ answers: answers })
+    body: JSON.stringify({ attempt_number: ATTEMPT_NUMBER, answers: answers })
   })
     .then(function (r) { return r.json(); })
     .then(function (data) { window.location = data.redirect_url; })
-    .catch(function () { el('feedback').textContent = 'Could not submit. Please try again.'; });
+    .catch(function () {
+      submitted = false;
+      el('feedback').textContent = 'Could not submit. ';
+      var retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'btn btn-secondary';
+      retry.textContent = 'Retry';
+      retry.addEventListener('click', submit);
+      el('feedback').appendChild(retry);
+    });
 }
+
+el('skip-btn').addEventListener('click', function () {
+  // '' = never tried (unattempted); a last wrong answer counts as incorrect.
+  el('feedback').className = 'feedback';
+  el('feedback').textContent = 'Skipped.';
+  next(lastWrong);
+});
 
 el('answer-form').addEventListener('submit', function (e) {
   e.preventDefault();
@@ -80,6 +107,7 @@ el('answer-form').addEventListener('submit', function (e) {
     next(value);
   } else {
     fb.className = 'feedback incorrect';
+    lastWrong = value;
     fb.textContent = 'Not quite. ' + (MAX_TRIES - tries) + ' tries left.';
     el('answer').select();
   }

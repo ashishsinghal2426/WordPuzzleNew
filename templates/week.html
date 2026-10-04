@@ -5,12 +5,19 @@
 <h1>Week {{ week_num }}: {{ theme }}</h1>
 
 <div class="card">
-  {% if completed %}
-    <p>You scored <strong>{{ attempt.score }} / {{ attempt.total }}</strong> on this week's test.</p>
-    <a class="btn" href="{{ url_for('week_results', week_num=week_num) }}">View results</a>
-  {% else %}
-    <p>Study the words below, then take the spelling test. You only get one attempt.</p>
+  {% if attempts_used == 0 %}
+    <p>Study the words below, then take the spelling test. You have {{ max_attempts }} attempts.</p>
     <a class="btn" href="{{ url_for('week_test', week_num=week_num) }}">Start test</a>
+  {% else %}
+    {% if can_retake %}
+      <p>Attempt {{ attempts_used }} of {{ max_attempts }} used · Latest score <strong>{{ latest.score }} / {{ latest.total }}</strong></p>
+    {% else %}
+      <p>All {{ max_attempts }} attempts used · Latest score <strong>{{ latest.score }} / {{ latest.total }}</strong></p>
+    {% endif %}
+    <a class="btn" href="{{ url_for('week_results', week_num=week_num) }}">View results</a>
+    {% if can_retake %}
+      <a class="btn btn-secondary" href="{{ url_for('week_test', week_num=week_num) }}">Take test again</a>
+    {% endif %}
   {% endif %}
 </div>
 

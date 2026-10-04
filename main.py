@@ -9,8 +9,9 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import inspect
+from sqlalchemy.exc import IntegrityError
 from models import (db, User, Word, TestAttempt, TestAnswer,
-                    STATUS_CORRECT, STATUS_INCORRECT)
+                    STATUS_CORRECT, STATUS_INCORRECT, STATUS_UNATTEMPTED)
 from words_data import PRIMARY_WORDS, SECONDARY_WORDS, WordDataError, validate_word_data
 
 app = Flask(__name__)
@@ -31,6 +32,7 @@ def load_user(user_id):
 WEEKS_PER_LEVEL = {'primary': 30, 'secondary': 20}
 WORDS_PER_WEEK = 10
 MAX_ATTEMPTS = 3
+MAX_TRIES_PER_WORD = 3
 
 
 def setup_database():
@@ -180,6 +182,21 @@ def select_level():
     return render_template('select_level.html', current_level=current_user.level)
 
 
+def get_attempts(user_id, level, week_num):
+    return TestAttempt.query.filter_by(
+        user_id=user_id, level=level, week_number=week_num
+    ).order_by(TestAttempt.attempt_number).all()
+
+
+def _word_dict(w):
+    return {
+        'id': w.id, 'word': w.word, 'pos': w.pos, 'meaning': w.meaning,
+        'sentence': w.sentence,
+        'synonyms': json.loads(w.synonyms) if w.synonyms else [],
+        'antonyms': json.loads(w.antonyms) if w.antonyms else []
+    }
+
+
 # ── Weekly plan ───────────────────────────────────────────────────────────────
 
 @app.route('/plan')
@@ -187,21 +204,27 @@ def select_level():
 def plan():
     level = current_user.level
     total_weeks = weeks_for_level(level)
-    completed_weeks = {
-        a.week_number for a in
-        TestAttempt.query.filter_by(user_id=current_user.id, level=level).all()
-    }
+    attempts_by_week = {}
+    for a in (TestAttempt.query.filter_by(user_id=current_user.id, level=level)
+              .order_by(TestAttempt.attempt_number).all()):
+        attempts_by_week.setdefault(a.week_number, []).append(a)
     week_list = []
     for wn in range(1, total_weeks + 1):
         words = Word.query.filter_by(level=level, week_number=wn).all()
         theme = words[0].theme if words else ''
+        week_attempts = attempts_by_week.get(wn, [])
+        latest = week_attempts[-1] if week_attempts else None
         week_list.append({
             'week_number': wn,
             'theme': theme,
             'word_count': len(words),
-            'completed': wn in completed_weeks
+            'attempts_used': len(week_attempts),
+            'latest_score': latest.score if latest else None,
+            'latest_total': latest.total if latest else None,
+            'completed': len(week_attempts) > 0
         })
-    return render_template('plan.html', weeks=week_list, level=level)
+    return render_template('plan.html', weeks=week_list, level=level,
+                           max_attempts=MAX_ATTEMPTS)
 
 
 # ── Week detail ───────────────────────────────────────────────────────────────
@@ -217,18 +240,13 @@ def week_view(week_num):
     if not words:
         flash('No words found for this week.', 'warning')
         return redirect(url_for('plan'))
-    word_list = [{
-        'id': w.id, 'word': w.word, 'pos': w.pos, 'meaning': w.meaning,
-        'sentence': w.sentence,
-        'synonyms': json.loads(w.synonyms) if w.synonyms else [],
-        'antonyms': json.loads(w.antonyms) if w.antonyms else []
-    } for w in words]
-    attempt = TestAttempt.query.filter_by(
-        user_id=current_user.id, week_number=week_num, level=level
-    ).order_by(TestAttempt.completed_at.desc()).first()
-    return render_template('week.html', words=word_list, week_num=week_num,
-                           theme=words[0].theme, completed=attempt is not None,
-                           attempt=attempt, level=level)
+    attempts = get_attempts(current_user.id, level, week_num)
+    return render_template('week.html', words=[_word_dict(w) for w in words],
+                           week_num=week_num, theme=words[0].theme, level=level,
+                           attempts=attempts, attempts_used=len(attempts),
+                           max_attempts=MAX_ATTEMPTS,
+                           latest=attempts[-1] if attempts else None,
+                           can_retake=len(attempts) < MAX_ATTEMPTS)
 
 
 # ── Test ──────────────────────────────────────────────────────────────────────
@@ -240,88 +258,108 @@ def week_test(week_num):
     if week_num < 1 or week_num > weeks_for_level(level):
         flash('Week not found.', 'danger')
         return redirect(url_for('plan'))
-    if TestAttempt.query.filter_by(
-        user_id=current_user.id, week_number=week_num, level=level
-    ).first():
-        flash('You already completed this test.', 'info')
+    attempts = get_attempts(current_user.id, level, week_num)
+    if len(attempts) >= MAX_ATTEMPTS:
+        flash(f'You have used all {MAX_ATTEMPTS} attempts for this week.', 'info')
         return redirect(url_for('week_results', week_num=week_num))
     words = Word.query.filter_by(level=level, week_number=week_num).all()
     if not words:
         flash('No words found.', 'warning')
         return redirect(url_for('plan'))
     random.shuffle(words)
-    word_list = [{
-        'id': w.id, 'word': w.word, 'pos': w.pos, 'meaning': w.meaning,
-        'sentence': w.sentence,
-        'synonyms': json.loads(w.synonyms) if w.synonyms else [],
-        'antonyms': json.loads(w.antonyms) if w.antonyms else []
-    } for w in words]
-    return render_template('test.html', words=word_list, week_num=week_num,
-                           theme=words[0].theme, level=level)
+    return render_template('test.html', words=[_word_dict(w) for w in words],
+                           week_num=week_num, theme=words[0].theme, level=level,
+                           attempt_number=len(attempts) + 1, max_attempts=MAX_ATTEMPTS)
 
 
 @app.route('/week/<int:week_num>/test/submit', methods=['POST'])
 @login_required
 def week_test_submit(week_num):
     level = current_user.level
-    if TestAttempt.query.filter_by(
-        user_id=current_user.id, week_number=week_num, level=level
-    ).first():
-        return jsonify({'redirect_url': url_for('week_results', week_num=week_num)})
-    data = request.get_json() or {}
-    answers = data.get('answers', [])
-    valid_words = {
-        w.id: w for w in Word.query.filter_by(level=level, week_number=week_num).all()
-    }
+    results_url = url_for('week_results', week_num=week_num)
+    data = request.get_json(silent=True) or {}
+    attempts = get_attempts(current_user.id, level, week_num)
+    if len(attempts) >= MAX_ATTEMPTS or data.get('attempt_number') != len(attempts) + 1:
+        return jsonify({'redirect_url': results_url})  # duplicate or stale submit: no write
+    words = Word.query.filter_by(level=level, week_number=week_num).all()
+    if not words:
+        return jsonify({'redirect_url': results_url})
+    submitted = {}
+    for a in data.get('answers') or []:
+        if isinstance(a, dict):
+            submitted[a.get('word_id')] = a
     attempt = TestAttempt(
-        user_id=current_user.id, week_number=week_num,
-        level=level, attempt_number=1, score=0, total=len(valid_words)
+        user_id=current_user.id, week_number=week_num, level=level,
+        attempt_number=len(attempts) + 1, score=0, total=len(words)
     )
     db.session.add(attempt)
-    db.session.flush()
     score = 0
-    for a in answers:
-        word = valid_words.get(a.get('word_id'))
-        if not word:
-            continue
-        correct = str(a.get('user_answer', '')).strip().lower() == word.word.lower()
-        if correct:
+    for word in words:
+        a = submitted.get(word.id)
+        text = str(a.get('user_answer') or '').strip() if a else ''
+        if text == '':
+            status = STATUS_UNATTEMPTED
+            tries = 0
+        else:
+            status = STATUS_CORRECT if text.lower() == word.word.lower() else STATUS_INCORRECT
+            try:
+                tries = max(1, min(MAX_TRIES_PER_WORD, int(a.get('attempt_count', 1))))
+            except (TypeError, ValueError):
+                tries = 1
+        if status == STATUS_CORRECT:
             score += 1
-        db.session.add(TestAnswer(
-            attempt_id=attempt.id, word_id=word.id,
-            user_answer=str(a.get('user_answer', '')).strip(),
-            is_correct=correct,
-            status=STATUS_CORRECT if correct else STATUS_INCORRECT,
-            attempt_count=int(a.get('attempt_count', 1))
+        attempt.answers.append(TestAnswer(
+            word_id=word.id, user_answer=text, status=status,
+            is_correct=(status == STATUS_CORRECT), attempt_count=tries
         ))
     attempt.score = score
-    db.session.commit()
-    return jsonify({'score': score, 'total': len(valid_words),
-                    'redirect_url': url_for('week_results', week_num=week_num)})
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()  # lost a race with a parallel submit of the same attempt
+        return jsonify({'redirect_url': results_url})
+    return jsonify({'score': score, 'total': len(words),
+                    'attempt_number': attempt.attempt_number,
+                    'redirect_url': url_for('week_results', week_num=week_num,
+                                            attempt=attempt.attempt_number)})
 
 
 @app.route('/week/<int:week_num>/results')
 @login_required
 def week_results(week_num):
     level = current_user.level
-    attempt = TestAttempt.query.filter_by(
-        user_id=current_user.id, week_number=week_num, level=level
-    ).order_by(TestAttempt.completed_at.desc()).first()
-    if not attempt:
+    attempts = get_attempts(current_user.id, level, week_num)
+    if not attempts:
         flash('No completed test found. Take the test first.', 'warning')
         return redirect(url_for('week_test', week_num=week_num))
-    rows = []
-    for ta in TestAnswer.query.filter_by(attempt_id=attempt.id).all():
-        w = Word.query.get(ta.word_id)
-        if w:
-            rows.append({
-                'word': w.word, 'pos': w.pos, 'meaning': w.meaning,
-                'user_answer': ta.user_answer, 'is_correct': ta.is_correct,
-                'attempt_count': ta.attempt_count
-            })
+    wanted = request.args.get('attempt', type=int)
+    if wanted is None:
+        attempt = attempts[-1]
+    else:
+        attempt = next((a for a in attempts if a.attempt_number == wanted), None)
+        if attempt is None:
+            flash('That attempt was not found.', 'warning')
+            return redirect(url_for('week_results', week_num=week_num))
+    rows = [{
+        'word': ta.word.word, 'pos': ta.word.pos, 'meaning': ta.word.meaning,
+        'user_answer': ta.user_answer, 'status': ta.status,
+        'attempt_count': ta.attempt_count
+    } for ta in TestAnswer.query.filter_by(attempt_id=attempt.id).all() if ta.word]
+    history = []
+    for a in attempts:
+        counts = {STATUS_CORRECT: 0, STATUS_INCORRECT: 0, STATUS_UNATTEMPTED: 0}
+        for ta in a.answers:
+            counts[ta.status] = counts.get(ta.status, 0) + 1
+        history.append({'attempt': a, 'correct': counts[STATUS_CORRECT],
+                        'incorrect': counts[STATUS_INCORRECT],
+                        'unattempted': counts[STATUS_UNATTEMPTED]})
+    current_counts = next(h for h in history if h['attempt'].id == attempt.id)
     first = Word.query.filter_by(level=level, week_number=week_num).first()
     return render_template('results.html', attempt=attempt, result_rows=rows,
-                           week_num=week_num, theme=first.theme if first else '', level=level)
+                           week_num=week_num, theme=first.theme if first else '', level=level,
+                           attempts=history, counts=current_counts,
+                           max_attempts=MAX_ATTEMPTS,
+                           can_retake=len(attempts) < MAX_ATTEMPTS)
 
 
 # ── Dictionary API proxy ──────────────────────────────────────────────────────
