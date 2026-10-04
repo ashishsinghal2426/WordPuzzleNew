@@ -8,7 +8,7 @@ import requests
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import inspect
+from sqlalchemy import func, inspect
 from sqlalchemy.exc import IntegrityError
 from models import (db, User, Word, TestAttempt, TestAnswer,
                     STATUS_CORRECT, STATUS_INCORRECT, STATUS_UNATTEMPTED)
@@ -387,16 +387,38 @@ def admin_dashboard():
     from collections import defaultdict
     users    = User.query.all()
     attempts = TestAttempt.query.all()
-    answers  = TestAnswer.query.all()
-    user_stats = []
+    # One grouped query for every attempt's status counts
+    status_counts = defaultdict(dict)
+    for attempt_id, status, n in (db.session.query(TestAnswer.attempt_id, TestAnswer.status, func.count())
+                                  .group_by(TestAnswer.attempt_id, TestAnswer.status).all()):
+        status_counts[attempt_id][status] = n
+    learner_progress = []
     for u in users:
-        ua = [a for a in attempts if a.user_id == u.id]
-        user_stats.append({
+        ua = [a for a in attempts if a.user_id == u.id and a.level == u.level]
+        weeks = weeks_for_level(u.level)
+        possible = weeks * MAX_ATTEMPTS
+        completed = len({a.week_number for a in ua})
+        learner_progress.append({
             'username': u.username, 'level': u.level, 'is_admin': u.is_admin,
-            'weeks_completed': len(ua),
-            'total_score': sum(a.score for a in ua),
-            'total_possible': sum(a.total for a in ua),
+            'completed': completed, 'weeks': weeks,
+            'completion_pct': round(completed / weeks * 100),
+            'attempts_used': len(ua), 'attempts_possible': possible,
+            'attempts_pct': round(len(ua) / possible * 100),
             'created_at': u.created_at
+        })
+    usernames = {u.id: u.username for u in users}
+    test_details = []
+    for a in sorted(attempts, key=lambda a: (usernames.get(a.user_id, ''), a.level,
+                                             a.week_number, a.attempt_number)):
+        c = status_counts[a.id]
+        test_details.append({
+            'username': usernames.get(a.user_id, ''), 'level': a.level,
+            'week_number': a.week_number, 'attempt_number': a.attempt_number,
+            'completed_at': a.completed_at,
+            'correct': c.get(STATUS_CORRECT, 0),
+            'incorrect': c.get(STATUS_INCORRECT, 0),
+            'unattempted': c.get(STATUS_UNATTEMPTED, 0),
+            'score_pct': round(a.score / a.total * 100) if a.total else 0
         })
     week_scores = defaultdict(list)
     for a in attempts:
@@ -406,13 +428,18 @@ def admin_dashboard():
         'level': lv, 'week_number': wn,
         'average_pct': round(sum(sc) / len(sc), 1), 'count': len(sc)
     } for (lv, wn), sc in sorted(week_scores.items())]
-    correct = sum(1 for a in answers if a.is_correct)
+    totals = {STATUS_CORRECT: 0, STATUS_INCORRECT: 0, STATUS_UNATTEMPTED: 0}
+    for counts in status_counts.values():
+        for status, n in counts.items():
+            totals[status] = totals.get(status, 0) + n
     return render_template('admin.html',
                            total_users=len(users),
-                           user_stats=user_stats,
+                           learner_progress=learner_progress,
+                           test_details=test_details,
                            per_week_averages=per_week,
-                           total_correct=correct,
-                           total_incorrect=len(answers) - correct)
+                           total_correct=totals[STATUS_CORRECT],
+                           total_incorrect=totals[STATUS_INCORRECT],
+                           total_unattempted=totals[STATUS_UNATTEMPTED])
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

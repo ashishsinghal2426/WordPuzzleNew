@@ -86,3 +86,43 @@ def test_test_page_script_is_valid_js(client, make_user, tmp_path):
     f.write_text(scripts[-1], encoding='utf-8')
     result = subprocess.run(['node', '--check', str(f)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
+
+
+def admin_page(client, make_user):
+    words = learner(client, make_user)
+    take(client, 1, words, correct=10)
+    take(client, 2, words, correct=4)
+    client.post('/week/1/test/submit', json={'attempt_number': 3, 'answers': []})
+    client.get('/logout')
+    make_user('boss', is_admin=True)
+    login(client, 'boss')
+    return client.get('/admin').get_data(as_text=True)
+
+
+def test_admin_learner_progress(client, make_user):
+    html = admin_page(client, make_user)
+    assert '1 / 30' in html and '3%' in html
+    assert '3 / 90 (3%)' in html
+
+
+def test_admin_test_details_rows(client, make_user):
+    html = admin_page(client, make_user)
+    rows = re.findall(r'<tr class="attempt-row">(.*?)</tr>', html, re.S)
+    assert len(rows) == 3
+    cells = [re.findall(r'<td[^>]*>(.*?)</td>', r, re.S) for r in rows]
+    cells = [[c.strip() for c in row] for row in cells]
+    assert [c[3] for c in cells] == ['1', '2', '3']
+    assert cells[0][5:] == ['10', '0', '0', '100%']
+    assert cells[1][5:] == ['4', '6', '0', '40%']
+    assert cells[2][5:] == ['0', '0', '10', '0%']
+
+
+def test_admin_unattempted_card(client, make_user):
+    html = admin_page(client, make_user)
+    m = re.search(r'Unattempted</div><div class="score unattempted">(\d+)<', html)
+    assert m and m.group(1) == '10'
+
+
+def test_admin_non_admin_redirected(client, make_user):
+    learner(client, make_user)
+    assert client.get('/admin').status_code == 302
