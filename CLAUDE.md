@@ -30,7 +30,7 @@ Default admin credentials: `admin` / `admin123`
 
 This is a Flask web application for a vocabulary learning game organized around weekly word sets.
 
-**Entry point:** `main.py` — contains the Flask app, all routes, and and `setup_database()`, which runs on startup (see Startup).
+**Entry point:** `main.py` — contains the Flask app, all routes, and `setup_database()`, which runs on startup (see Startup).
 
 **Models (`models.py`):**
 - `User` — authenticated users with a `level` field (`'primary'` or `'secondary'`) and `is_admin` flag
@@ -49,7 +49,7 @@ This is a Flask web application for a vocabulary learning game organized around 
 
 The database URI comes from the `WORDPUZZLE_DATABASE_URI` env var, defaulting to `sqlite:///wordpuzzle.db` (`instance/wordpuzzle.db`). The tests use it to point at a temporary database. Future schema changes need the same kind of detection (inspect the existing tables and upgrade explicitly), because `create_all()` never alters existing tables; or adopt Flask-Migrate.
 
-**Templates:** All extend `base.html` (navbar + flash messages). Route templates: `login.html`, `register.html`, `select_level.html`, `plan.html`, `week.html`, `test.html`, `results.html`, `admin.html`. `test.html` runs the test client-side (3 tries per word, plus a Skip button) and POSTs `{attempt_number, answers: [{word_id, user_answer, attempt_count}]}` to the submit endpoint. A skipped word is sent with an empty answer and stored as `unattempted`; a word that never got a correct answer in 3 tries is `incorrect`.
+**Templates:** All extend `base.html` (navbar + flash messages). Route templates: `login.html`, `register.html`, `select_level.html`, `plan.html`, `week.html`, `test.html`, `results.html`, `admin.html`. `test.html` runs the test client-side (3 tries per word, plus a Skip button) and POSTs `{attempt_number, answers: [{word_id, user_answer, attempt_count}]}` to the submit endpoint. Skipping a word with no tries yet sends an empty answer, stored as `unattempted` (`attempt_count` 0); skipping after a wrong try sends the last wrong answer, stored as `incorrect`. A word that never got a correct answer in 3 tries is `incorrect`.
 
 **Key route flow:**
 - `/` redirects to `/plan` (authenticated) or `/login`
@@ -69,7 +69,7 @@ Run the pytest suite (pinned in `requirements.txt`):
 .venv/Scripts/python -m pytest -q
 ```
 
-`tests/conftest.py` sets `WORDPUZZLE_DATABASE_URI` to a temporary SQLite file before importing `main`, so tests never touch `instance/wordpuzzle.db`. Suites cover word data validation, `setup_database()` (including the legacy upgrade), attempts, and pages. The test page logic lives in inline JS in `test.html` and is not exercised by pytest; at minimum extract the `<script>` and run `node --check` on it.
+`tests/conftest.py` sets `WORDPUZZLE_DATABASE_URI` to a temporary SQLite file before importing `main`, so tests never touch `instance/wordpuzzle.db`. Suites cover word data validation, `setup_database()` (including the legacy upgrade), attempts, and pages. The test page's inline JS in `test.html` is syntax-checked by `test_test_page_script_is_valid_js` in `tests/test_pages.py` (`node --check`, skipped if node is missing); the client-side flow itself (tries, Skip) is not exercised by pytest.
 
 ## Gotchas
 
