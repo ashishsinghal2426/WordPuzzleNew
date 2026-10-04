@@ -59,7 +59,7 @@ PRIMARY_WORDS = [
          'sentence': 'A single red petal floated down to the grass.',
          'synonyms': [], 'antonyms': []},
         {'word': 'hedge', 'pos': 'noun', 'meaning': 'A row of bushes growing close together, often as a fence.',
-         'sentence': 'A hedgehog was hiding under the hedge.',
+         'sentence': 'A sparrow was hiding in the hedge.',
          'synonyms': ['bushes', 'barrier'], 'antonyms': []},
         {'word': 'valley', 'pos': 'noun', 'meaning': 'A low area of land between hills or mountains.',
          'sentence': 'A river runs through the green valley.',
