@@ -139,3 +139,54 @@ def test_duplicate_word_within_same_week():
     primary = good_primary()
     primary[0]['words'][1] = make_word('apple')
     assert "primary week 1: 'apple' appears more than once" in run(primary=primary)
+
+
+# ── Real word data ────────────────────────────────────────────────────────────
+
+import re  # noqa: E402
+
+import main  # noqa: E402
+from words_data import PRIMARY_WORDS, SECONDARY_WORDS  # noqa: E402
+
+REAL = [('primary', PRIMARY_WORDS, 30), ('secondary', SECONDARY_WORDS, 20)]
+
+
+@pytest.mark.parametrize('level,data,weeks', REAL)
+def test_real_data_shape(level, data, weeks):
+    assert [w['week'] for w in data] == list(range(1, weeks + 1))
+    for week in data:
+        assert week['theme'].strip()
+        assert len(week['words']) == 10
+
+
+@pytest.mark.parametrize('level,data,weeks', REAL)
+def test_real_data_words_are_valid(level, data, weeks):
+    seen = set()
+    for week in data:
+        for w in week['words']:
+            for field in ('word', 'pos', 'meaning', 'sentence'):
+                assert w[field].strip(), (level, week['week'], w['word'], field)
+            assert re.fullmatch(r'[A-Za-z]+(-[A-Za-z]+)*', w['word']), w['word']
+            assert re.search(r'\b' + re.escape(w['word']) + r'\b', w['sentence'], re.I), w['word']
+            key = w['word'].lower()
+            assert key not in seen, key
+            seen.add(key)
+
+
+def test_real_data_passes_validator():
+    assert validate_word_data(PRIMARY_WORDS, SECONDARY_WORDS,
+                              main.WEEKS_PER_LEVEL, main.WORDS_PER_WEEK) == []
+
+
+def test_real_data_has_500_words():
+    total = sum(len(w['words']) for w in PRIMARY_WORDS + SECONDARY_WORDS)
+    assert total == 500
+
+
+def test_setup_database_refuses_invalid_data(app, monkeypatch):
+    broken = copy.deepcopy(PRIMARY_WORDS)
+    broken[0]['words'].pop()
+    monkeypatch.setattr(main, 'PRIMARY_WORDS', broken)
+    with pytest.raises(WordDataError) as exc:
+        main.setup_database()
+    assert 'primary week 1: expected 10 words, found 9' in exc.value.problems

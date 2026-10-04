@@ -1,12 +1,13 @@
 import json
 import os
 import random
+import sys
 import requests
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, Word, TestAttempt, TestAnswer
-from words_data import PRIMARY_WORDS, SECONDARY_WORDS
+from words_data import PRIMARY_WORDS, SECONDARY_WORDS, WordDataError, validate_word_data
 
 app = Flask(__name__)
 app.secret_key = 'wordpuzzle_gep_2024'
@@ -23,7 +24,15 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
+WEEKS_PER_LEVEL = {'primary': 30, 'secondary': 20}
+WORDS_PER_WEEK = 10
+
+
 def setup_database():
+    problems = validate_word_data(PRIMARY_WORDS, SECONDARY_WORDS,
+                                 weeks=WEEKS_PER_LEVEL, words_per_week=WORDS_PER_WEEK)
+    if problems:
+        raise WordDataError(problems)
     db.create_all()
     if Word.query.count() == 0:
         for level_name, data in [('primary', PRIMARY_WORDS), ('secondary', SECONDARY_WORDS)]:
@@ -58,7 +67,7 @@ def _ensure_admin():
 
 
 def weeks_for_level(level):
-    return 30 if level == 'primary' else 20
+    return WEEKS_PER_LEVEL[level]
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -337,6 +346,11 @@ def admin_dashboard():
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
-    with app.app_context():
-        setup_database()
+    try:
+        with app.app_context():
+            setup_database()
+    except WordDataError as err:
+        for problem in err.problems:
+            print(problem, file=sys.stderr)
+        sys.exit(1)
     app.run(debug=True)
