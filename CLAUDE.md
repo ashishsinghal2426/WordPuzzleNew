@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Overview
+
+WordPuzzle is a Flask vocabulary-learning app. Learners pick a level (primary: 30 weeks, secondary: 20 weeks), study a themed word list each week, and take a one-shot randomized spelling test. Results are tracked per word, and admins get a dashboard of progress across users and weeks.
+
+GitHub remote: https://github.com/ashishsinghal2426/WordPuzzleNew
+
+## Current Repo State
+
+Only `main.py`, `models.py`, and `requirements.txt` are committed. `words_data.py` and every template in `templates/` are missing, and `static/css` and `static/js` are empty. `main.py` imports `words_data` at module load, so the app will not start until those files exist. Do not assume template contents; ask or recreate them.
+
 ## Running the App
 
 ```bash
@@ -25,7 +35,7 @@ This is a Flask web application for a vocabulary learning game organized around 
 - `TestAttempt` — one record per user per week per level (tests are one-shot; retaking is blocked)
 - `TestAnswer` — per-word answer records linked to a `TestAttempt`, including `attempt_count` for how many tries the user needed
 
-**Word data (`words_data.py`, not committed):** Exports `PRIMARY_WORDS` and `SECONDARY_WORDS` — lists of dicts with shape `{'week': int, 'theme': str, 'words': [...]}`. Primary level has 30 weeks; secondary has 20.
+**Word data (`words_data.py`, not committed):** Exports `PRIMARY_WORDS` and `SECONDARY_WORDS` — lists of dicts with shape `{'week': int, 'theme': str, 'words': [...]}`. Each word is `{'word': str, 'meaning': str, 'pos'?: str, 'sentence'?: str, 'synonyms'?: [str], 'antonyms'?: [str]}` (see `init_db()` in `main.py`). Seeding only runs when the `Word` table is empty, so delete `wordpuzzle.db` to reload changed word data. Primary level has 30 weeks; secondary has 20.
 
 **Templates:** Jinja2 templates referenced by routes: `login.html`, `register.html`, `select_level.html`, `plan.html`, `week.html`, `test.html`, `results.html`, `admin.html`.
 
