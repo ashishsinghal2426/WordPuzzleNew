@@ -1,4 +1,5 @@
 import json
+import os
 import random
 import requests
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
@@ -9,7 +10,7 @@ from words_data import PRIMARY_WORDS, SECONDARY_WORDS
 
 app = Flask(__name__)
 app.secret_key = 'wordpuzzle_gep_2024'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wordpuzzle.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('WORDPUZZLE_DATABASE_URI', 'sqlite:///wordpuzzle.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
@@ -22,7 +23,8 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
-def init_db():
+def setup_database():
+    db.create_all()
     if Word.query.count() == 0:
         for level_name, data in [('primary', PRIMARY_WORDS), ('secondary', SECONDARY_WORDS)]:
             for week_data in data:
@@ -40,6 +42,10 @@ def init_db():
                     )
                     db.session.add(word)
         db.session.commit()
+    _ensure_admin()
+
+
+def _ensure_admin():
     if not User.query.filter_by(username='admin').first():
         admin = User(
             username='admin',
@@ -332,6 +338,5 @@ def admin_dashboard():
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
-        init_db()
+        setup_database()
     app.run(debug=True)
